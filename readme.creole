@@ -1,0 +1,14 @@
+= netview
+
+Netview is a enumeration tool. It uses (with the -d) the current domain or a
+specified domain (with the -d domain) to enumerate hosts. You can also use
+the -f if you wish to specify a file with a list of hosts instead.
+
+Once a list is gathered, netview check each for the following
++ IP addresses
++ Shares
++ Sessions (users connected to the machine from a remote source)
++ and Logged on users
+
+Optionally all output can be redirected to a file with the '-o' argument.
+
