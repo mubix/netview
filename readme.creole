@@ -1,3 +1,4 @@
+
 = netview
 
 Netview is a enumeration tool. It uses (with the -d) the current domain or a
@@ -11,4 +12,59 @@ Once a list is gathered, netview check each for the following
 + and Logged on users
 
 Optionally all output can be redirected to a file with the '-o' argument.
+
+== Example output
+
+=== no arguments
+{{{
+C:\>netview.exe
+
+Netviewer Help
+--------------------------------------------------------------------
+
+-d domain               : Specifies a domain to pull a list of hosts from
+                          uses current domain if none specifed
+
+-f filename.txt         : Speficies a file to pull a list of hosts from
+-o filename.txt         : Out to file instead of STDOUT
+}}}
+
+=== -d / -d with domain / or -f with filename
+{{{
+C:\>netview.exe -d
+
+[*] -d used without domain specifed - using current domain
+[+] Number of hosts: 1
+
+[+] Host: HOST1
+
+Enumerating AD Info
+[+] HOST1 - Comment -
+[+] HOST1 - OS Version - 6.1
+
+Enumerating IP Info
+[+] HOST1 - IPv6 Address - fe80::(removed from example)%10
+[+] HOST1 - IPv6 Address - fe80::(removed from example)%15
+[+] HOST1 - IPv6 Address - fe80::(removed from example)%12
+[+] HOST1 - IPv4 Address - 172.16.10.50
+[+] HOST1 - IPv4 Address - 192.168.56.1
+[+] HOST1 - IPv6 Address - 2001:(removed from example)
+
+Enumerating Share Info
+[+] HOST1 - Share - ADMIN$              Remote Admin
+[+] HOST1 - Share - C$                  Default share
+[+] HOST1 - Share - Backups
+[+] HOST1 - Share - Finance
+[+] HOST1 - Share - IPC$                Remote IPC
+[+] HOST1 - Share - print$              Printer Drivers
+[+] HOST1 - Share - SharedPrinter       Kyocera 5112
+
+Enumerating Session Info
+[+] HOST1 - Session - MUBIX from \\172.16.10.207 - Active: 48 - Idle: 44
+
+Enumerating Logged-on Users
+[+] HOST1 - Logged-on - HOST1\mubix
+[+] HOST1 - Logged-on - HOST1\mubix
+
+}}}
 
