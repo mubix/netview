@@ -1,4 +1,3 @@
-
 = netview
 
 Netview is a enumeration tool. It uses (with the -d) the current domain or a
@@ -41,6 +40,7 @@ C:\>netview.exe -d
 Enumerating AD Info
 [+] HOST1 - Comment -
 [+] HOST1 - OS Version - 6.1
+[+] HOST1 - MSSQL Server
 
 Enumerating IP Info
 [+] HOST1 - IPv6 Address - fe80::(removed from example)%10
