@@ -29,6 +29,7 @@
 #include <vector>
 #include <iostream>
 #include <string.h>
+#include "./banned.h"
 
 // Windows includes
 #include <winsock2.h>
