@@ -4,6 +4,8 @@ Netview is a enumeration tool. It uses (with the -d) the current domain or a
 specified domain (with the -d domain) to enumerate hosts. You can also use
 the -f if you wish to specify a file with a list of hosts instead.
 
+Info & Compiled version: http://www.room362.com/blog/2012/10/8/compiling-and-release-of-netview.html
+
 Once a list is gathered, netview check each for the following
 + IP addresses
 + Shares
