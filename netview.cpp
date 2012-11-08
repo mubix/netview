@@ -1,7 +1,5 @@
 // netview.cpp : Defines the entry point for the console application.
 //
-
-
 /*
              _         _               
   _ __   ___| |___   _(_) _____      __
@@ -12,33 +10,48 @@
                         v1.0
 
 						*/
+/*
+BackTrack5 R3 
+/usr/bin/i586-mingw32msvc-g++ netview.cpp -D__MINGW32__ -DWINVER=0x0501 -DUNICODE -D_UNICODE -s -Wl,--subsystem,windows -Wall -g -I"/usr/i586-mingw32msvc/include" -I"/usr/amd64-mingw32msvc/include/sec_api" -L"/usr/i586-mingw32msvc/lib" -lws2_32 -lnetapi32 -ladvapi32 -lmingw32 -o netview.exe
+*/
 
-#ifndef UNICODE
-	#define UNICODE
+#ifndef _UNICODE
+#define _UNICODE
 #endif
-
-#define _CRT_SECURE_NO_DEPRECATE 1
-
-#pragma comment(lib, "netapi32.lib")
-#pragma comment(lib, "ws2_32.lib")
-#pragma comment(lib, "advapi32.lib")
-
-#define WIN32_LEAN_AND_MEAN
-
+#ifndef UNICODE
+#define UNICODE
+#endif
 // C includes
 #include <vector>
 #include <iostream>
 #include <string.h>
-#include "./banned.h"
-
-// Windows includes
-#include <winsock2.h>
-#include <Ws2tcpip.h>
 #include <stdio.h>
 #include <assert.h>
-#include <windows.h>
+					
+// Windows includes 
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <windows.h> 
 #include <lm.h>
+#include "./banned.h"
+
+
+
 using namespace std;
+
+#ifdef __MINGW32__
+// This is if __MINGW32__ is not placed as a -D flag for the complier.
+// The compiler will default to _WIN32 options. 
+#else
+
+#pragma comment(lib, "netapi32.lib")
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "advapi32.lib")
+#define WIN32_LEAN_AND_MEAN
+#define _CRT_SECURE_NO_DEPRECATE 1
+#endif
 
 void netview_enum(vector<wstring> &hosts, wchar_t *domain);
 void net_enum(wchar_t *host, wchar_t *domain);
@@ -47,6 +60,12 @@ void share_enum(wchar_t *host);
 void session_enum(wchar_t *host);
 void loggedon_enum(wchar_t *host);
 
+#ifdef __MINGW32__
+//This option is to handle the Unicode mangling with the wmain error.
+//By default wmain's entry point is not found this is a temporary fix.
+//https://github.com/coderforlife/mingw-unicode-main
+#include "mingw-unicode.c"
+#endif
 int wmain(int argc, wchar_t * argv[])
 {
 	FILE *file_of_hosts;
@@ -65,12 +84,9 @@ int wmain(int argc, wchar_t * argv[])
 
 	vector<wstring> hosts;
 
-	// just add some spacing for readablility
-	printf("\n");
-
 	if (argc == 1)
 	{
-		printf("Netviewer Help\n"
+		printf("\nNetviewer Help\n"
 			"--------------------------------------------------------------------\n\n"
 			"-d domain \t\t: Specifies a domain to pull a list of hosts from\n"
 			"\t\t\t  uses current domain if none specifed\n\n"
@@ -84,7 +100,6 @@ int wmain(int argc, wchar_t * argv[])
 	// Parse cmdline arguments
 	for (int nArg=0; nArg < argc; nArg++)
 	{
-		//printf("Total args: %d - Current Loop: %d\n", argc, nArg);
 		if (!_wcsicmp(argv[nArg], L"-o"))
 		{
 			if ((nArg + 1) > (argc - 1) || !_wcsicmp(argv[(nArg + 1)], L"-d") || !_wcsicmp(argv[(nArg + 1)], L"-f"))
@@ -94,12 +109,19 @@ int wmain(int argc, wchar_t * argv[])
 			}
 			else
 			{
-				size_t origsize = wcslen(argv[(nArg + 1)]) + 1;
 				const size_t newsize = 255;
-				size_t convertedChars = 0;
 				char nstring[newsize];
-				wcstombs_s(&convertedChars, nstring, origsize, argv[(nArg + 1)], _TRUNCATE);
+
+				#ifdef __MINGW32__
+					wcstombs(nstring, argv[(nArg + 1)],newsize);
+				#else	
+					size_t origsize = wcslen(argv[(nArg + 1)]) + 1;				
+					size_t convertedChars = 0;				
+					wcstombs_s(&convertedChars, nstring, origsize, argv[(nArg + 1)], _TRUNCATE);				
+				#endif
+
 				outputfilename = nstring;
+
 				if((outputfile=freopen(outputfilename, "w" ,stdout))==NULL) {
 					printf("Cannot open %s for writing\n",outputfilename);
 					exit(1);
@@ -114,17 +136,21 @@ int wmain(int argc, wchar_t * argv[])
 			{
 				printf("[-] -f used without a file name specified\n");
 				return 0;
-				//file_of_hosts = _wfopen(argv[(nArg + 1)], L"r");
 			}
 			else
-			{
-				size_t origsize = wcslen(argv[(nArg + 1)]) + 1;
+			{				
 				const size_t newsize = 255;
-				size_t convertedChars = 0;
 				char nstring[newsize];
-				wcstombs_s(&convertedChars, nstring, origsize, argv[(nArg + 1)], _TRUNCATE);
+				
+				#ifdef __MINGW32__
+					wcstombs(nstring, argv[(nArg + 1)],newsize);
+				#else	
+					size_t origsize = wcslen(argv[(nArg + 1)]) + 1;				
+					size_t convertedChars = 0;				
+					wcstombs_s(&convertedChars, nstring, origsize, argv[(nArg + 1)], _TRUNCATE);				
+				#endif
+
 				filename = nstring;
-				//filename = argv[(nArg + 1)];
 				bReadFromFile = TRUE;
 			}
 		}
@@ -155,13 +181,13 @@ int wmain(int argc, wchar_t * argv[])
 	}
 
 	// pull file into array if read from file done
-
 	// pull domain via NetServerEnum into array if read from domain done
 	if(bReadFromFileArg)
 	{
+		printf("Reading from the file\n");
 		
-		///*
 		file_of_hosts = fopen(filename,"r");
+		
 		if (file_of_hosts == NULL)
 		{
 			printf("[-] File not found as specifed by -f\n");
@@ -171,11 +197,17 @@ int wmain(int argc, wchar_t * argv[])
 			while (fgets(line, sizeof(line)-1,file_of_hosts))
 			{
 				sscanf(line, "%s\n", tmphost);
-				size_t origsize = strlen(tmphost) + 1;
 				const size_t newsize = 255;
-				size_t convertedChars = 0;
 				wchar_t wcstring[newsize];
-				mbstowcs_s(&convertedChars, wcstring, origsize, tmphost, _TRUNCATE);
+				
+				#ifdef __MINGW32__
+					mbstowcs(wcstring,tmphost,newsize);
+				#else				
+					size_t origsize = strlen(tmphost) + 1;				
+					size_t convertedChars = 0;				
+					mbstowcs_s(&convertedChars, wcstring, origsize, tmphost, _TRUNCATE);
+				#endif							
+				
 				hosts.push_back(wstring(wcstring));
 			}
 			fclose(file_of_hosts);
@@ -223,20 +255,20 @@ void netview_enum(vector<wstring> &hosts, wchar_t *domain)
 
 
 	nStatus = NetServerEnum(pszServerName,
-								dwLevel,
-								(LPBYTE *) & pBuf,
-								dwPrefMaxLen,
-								&dwEntriesRead,
-								&dwTotalEntries,
-								dwServerType,
-								pszDomainName,
-								&dwResumeHandle);
+				dwLevel,
+				(LPBYTE *) & pBuf,
+				dwPrefMaxLen,
+				&dwEntriesRead,
+				&dwTotalEntries,
+				dwServerType,
+				pszDomainName,
+				&dwResumeHandle);
 
 	if ((nStatus == NERR_Success) || (nStatus == ERROR_MORE_DATA))
 	{
 		if ((pTmpBuf = pBuf) != NULL)
 		{
-			for (int i = 0; i < dwEntriesRead; i++)
+			for (unsigned int i = 0; i < dwEntriesRead; i++)
 			{
 				assert(pTmpBuf != NULL);
 				if (pTmpBuf == NULL)
@@ -287,8 +319,7 @@ void net_enum(wchar_t *host, wchar_t *domain)
 			else
 			{
 				wprintf(L"[+] %ws - Comment - %s\n", host, pTmpBuf->sv101_comment);
-				printf("[+] %ws - OS Version - %d.%d\n", host, pTmpBuf->sv101_version_major, pTmpBuf->sv101_version_minor);
-				//printf("Type: %d\t", pTmpBuf->sv101_type);
+				printf("[+] %s - OS Version - %d.%d\n", (char*)host, (int)pTmpBuf->sv101_version_major, (int)pTmpBuf->sv101_version_minor);
 				if (pTmpBuf->sv101_type & SV_TYPE_DOMAIN_CTRL)
 				{
 					wprintf(L"[+] %ws - Domain Controller\n", host);
@@ -313,14 +344,26 @@ void net_enum(wchar_t *host, wchar_t *domain)
 
 void ip_enum(wchar_t *host)
 {
+
+	wprintf(L"The hostcoming into the function is: %ls\n",host);
+
 	WSADATA wsaData;
 	int iResult;
 	int iRetval;
 	DWORD dwRetval;
-	int x = 1;
+	
+	#ifdef __MINGW32__	
+	struct addrinfo *result = NULL;
+   	struct addrinfo *ptr = NULL;
+    	struct addrinfo hints;
+	#else
+	// This struct call is used for the Visual Studio Compiler and
+	// does not work with the MinGW Compiler's libs as of yet.
 	ADDRINFOW *result = NULL;
 	ADDRINFOW *ptr = NULL;
 	ADDRINFOW hints;
+	#endif
+
 	LPSOCKADDR sockaddr_ip;
 	wchar_t ipstringbuffer[46];
 	DWORD ipbufferlength = 46;
@@ -338,8 +381,19 @@ void ip_enum(wchar_t *host)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
 
-	dwRetval = GetAddrInfoW(host, 0, &hints, &result);
 
+	#ifdef __MINGW32__
+
+	char tmphost[255];
+	int len = 0;
+	len = wcstombs(tmphost, host, sizeof(tmphost));
+	dwRetval = getaddrinfo(tmphost, 0, &hints, &result);
+
+	#else
+	// The older veriosn of getaddrinfo is used that does not support Unicode.
+	dwRetval = GetAddrInfoW(host, 0, &hints, &result);
+	#endif
+	
 	if ( dwRetval != 0 )
 	{
 		wprintf(L"[-] %ls - IP(s) could not be enumerated\n", host);
@@ -353,14 +407,14 @@ void ip_enum(wchar_t *host)
 		{
 			switch (ptr->ai_family) {
 			case AF_INET:
-				wprintf(L"[+] %ws - IPv4 Address - ");
+				wprintf(L"[+] %ls - IPv4 Address - ");
 				sockaddr_ip = (LPSOCKADDR) ptr->ai_addr;
 				ipbufferlength = 46;
 				iRetval = WSAAddressToString(sockaddr_ip, (DWORD) ptr->ai_addrlen, NULL, ipstringbuffer, &ipbufferlength);
 				if (iRetval)
 					wprintf(L"WSAAddressToString failed with %u\n", WSAGetLastError() );
 				else
-					wprintf(L"%ws\n", ipstringbuffer);
+					wprintf(L"%ls\n", ipstringbuffer);
 					break;
 			case AF_INET6:
 				wprintf(L"[+] %ws - IPv6 Address - ");
@@ -377,7 +431,13 @@ void ip_enum(wchar_t *host)
 				break;
 			}
 		}
+		#ifdef __MINGW32__
+		freeaddrinfo(result);
+		#else
+		// The older veriosn of freeaddrinfo is used that does not support Unicode.
 		FreeAddrInfoW(result);
+		#endif		
+
 		WSACleanup();
 	}
 }
@@ -386,7 +446,6 @@ void share_enum(wchar_t *host)
 {
 	PSHARE_INFO_1 BufPtr,p;
 	NET_API_STATUS res;
-	LPTSTR   lpszServer = NULL;
 	DWORD er=0,tr=0,resume=0, t;
 
 	printf("\nEnumerating Share Info\n");
@@ -399,14 +458,14 @@ void share_enum(wchar_t *host)
 			p=BufPtr;
 			for(t=1;t<=er;t++)
 			{
-				printf("[+] %ws - Share - %-20S%-30S\n", host, p->shi1_netname, p->shi1_remark);
+				wprintf(L"[+] %ls - Share - %-20S%-30S\n", host, p->shi1_netname, p->shi1_remark);
 				p++;
 			}
 			NetApiBufferFree(BufPtr);
 		} 
 		else
 		{ 
-			printf("[-] %ws - Share - Error: %ld\n", host, res);
+			wprintf(L"[-] %ls - Share - Error: %ld\n", host, res);
 		}  
 	} while (res==ERROR_MORE_DATA);
 }
@@ -431,14 +490,14 @@ void session_enum(wchar_t *host)
 	do
 	{
 		nStatus = NetSessionEnum(host,
-								pszClientName,
-								pszUserName,
-								dwLevel,
-								(LPBYTE*)&pBuf,
-								dwPrefMaxLen,
-								&dwEntriesRead,
-								&dwTotalEntries,
-								&dwResumeHandle);
+					pszClientName,
+					pszUserName,
+					dwLevel,
+					(LPBYTE*)&pBuf,
+					dwPrefMaxLen,
+					&dwEntriesRead,
+					&dwTotalEntries,
+					&dwResumeHandle);
 
 		if ((nStatus == NERR_Success) || (nStatus == ERROR_MORE_DATA))
 		{
@@ -468,7 +527,7 @@ void session_enum(wchar_t *host)
 		}
 		else
 		{
-			printf("[-] %ws - Session - Error: %ld\n", host, nStatus);
+			wprintf(L"[-] %ls - Session - Error: %ld\n", host, nStatus);
 		}
 
 		if (pBuf != NULL)
@@ -501,12 +560,12 @@ void loggedon_enum(wchar_t *host)
 	do
 	{
 		nStatus = NetWkstaUserEnum(host,
-									dwLevel,
-									(LPBYTE*)&pBuf,
-									dwPrefMaxLen,
-									&dwEntriesRead,
-									&dwTotalEntries,
-									&dwResumeHandle);
+					dwLevel,
+					(LPBYTE*)&pBuf,
+					dwPrefMaxLen,
+					&dwEntriesRead,
+					&dwTotalEntries,
+					&dwResumeHandle);
 
 		if ((nStatus == NERR_Success) || (nStatus == ERROR_MORE_DATA))
 		{
@@ -532,7 +591,7 @@ void loggedon_enum(wchar_t *host)
 			}
 			else
 			{
-				printf("[-] %ws - Logged-on - Error: %ld\n", host, nStatus);
+				wprintf(L"[-] %ls - Logged-on - Error: %ld\n", host, nStatus);
 			}
 		}
 
