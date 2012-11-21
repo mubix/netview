@@ -458,7 +458,9 @@ void share_enum(wchar_t *host)
 			p=BufPtr;
 			for(t=1;t<=er;t++)
 			{
-				wprintf(L"[+] %ls - Share - %-20S%-30S\n", host, p->shi1_netname, p->shi1_remark);
+				wprintf(L"[+] %ls - Share - %-20s%-30s\n", host, p->shi1_netname, p->shi1_remark);
+				// Suggested mod by "Ben" on R362 comments. Need to figure the best way to print type.
+				//wprintf(L"[+] %ls - Share - %s - %s - %s\n", host, p->shi1_netname,p->shi1_type, p->shi1_remark);
 				p++;
 			}
 			NetApiBufferFree(BufPtr);
