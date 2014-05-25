@@ -7,11 +7,11 @@
  | | | |  __/ |_ \ V /| |  __/\ V  V / 
  |_| |_|\___|\__| \_/ |_|\___| \_/\_/  
                         by mubix [at] hak5.org               
-                        v1.0
+                        v1.1
 
 						*/
 /*
-BackTrack5 R3 
+Kali 
 /usr/bin/i586-mingw32msvc-g++ netview.cpp -D__MINGW32__ -DWINVER=0x0501 -DUNICODE -D_UNICODE -s -Wl,--subsystem,windows -Wall -g -I"/usr/i586-mingw32msvc/include" -I"/usr/amd64-mingw32msvc/include/sec_api" -L"/usr/i586-mingw32msvc/lib" -lws2_32 -lnetapi32 -ladvapi32 -lmingw32 -o netview.exe
 */
 
@@ -27,6 +27,9 @@ BackTrack5 R3
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <cstdlib>
+#include <ctime>
+#include <algorithm>
 					
 // Windows includes 
 #include <winsock2.h>
@@ -37,7 +40,7 @@ BackTrack5 R3
 #include <lm.h>
 #include "./banned.h"
 
-
+#pragma warning(disable:4996)
 
 using namespace std;
 
@@ -53,12 +56,15 @@ using namespace std;
 #define _CRT_SECURE_NO_DEPRECATE 1
 #endif
 
+void print_help();
 void netview_enum(vector<wstring> &hosts, wchar_t *domain);
 void net_enum(wchar_t *host, wchar_t *domain);
 void ip_enum(wchar_t *host);
-void share_enum(wchar_t *host);
-void session_enum(wchar_t *host);
-void loggedon_enum(wchar_t *host);
+void group_enum(vector<wstring> &users, wchar_t *group);
+void share_enum(wchar_t *host, bool bCheckShareAccess);
+void session_enum(vector<wstring> &users, wchar_t *host);
+void loggedon_enum(vector<wstring> &users, wchar_t *host);
+bool CanAccessFolder( LPCTSTR folderName, DWORD genericAccessRights );
 
 #ifdef __MINGW32__
 //This option is to handle the Unicode mangling with the wmain error.
@@ -69,40 +75,45 @@ void loggedon_enum(wchar_t *host);
 int wmain(int argc, wchar_t * argv[])
 {
 	FILE *file_of_hosts;
+	FILE *file_exclude_hosts;
 	FILE *outputfile;
 	BOOL bReadFromFile = FALSE;
-	BOOL bDomainSpecifed = FALSE;
+	BOOL bDomainspecified = FALSE;
+	BOOL bCheckShareAccess = FALSE;
 	BOOL bReadFromFileArg = FALSE;
 	BOOL bDomainArg = FALSE;
 	BOOL bOutputToFile = FALSE;
 	wchar_t *domain = NULL;
+	wchar_t *group = NULL;
 	wchar_t *host = NULL;
+	wchar_t *tempHost = NULL;
+	int interval = 0;
+	double jitter = 0;
 	char *filename;
 	char *outputfilename;
 	char line[255];
 	char tmphost[255];
-
 	vector<wstring> hosts;
+	vector<wstring> users;
+	vector<wstring> excludeHosts;
 
 	if (argc == 1)
-	{
-		printf("\nNetviewer Help\n"
-			"--------------------------------------------------------------------\n\n"
-			"-d domain \t\t: Specifies a domain to pull a list of hosts from\n"
-			"\t\t\t  uses current domain if none specifed\n\n"
-			"-f filename.txt \t: Speficies a file to pull a list of hosts from\n"
-			"-o filename.txt \t: Out to file instead of STDOUT\n"
-			);
-		printf("\n");
+	{ 
+		print_help();
 		return 0;
 	}
 
 	// Parse cmdline arguments
 	for (int nArg=0; nArg < argc; nArg++)
 	{
+		if (!_wcsicmp(argv[nArg], L"-h"))
+		{
+			print_help();
+			exit(0);
+		}
 		if (!_wcsicmp(argv[nArg], L"-o"))
 		{
-			if ((nArg + 1) > (argc - 1) || !_wcsicmp(argv[(nArg + 1)], L"-d") || !_wcsicmp(argv[(nArg + 1)], L"-f"))
+			if ((nArg + 1) > (argc - 1) || !_wcsicmp(argv[(nArg + 1)], L"-d") || !_wcsicmp(argv[(nArg + 1)], L"-f") || !_wcsicmp(argv[(nArg + 1)], L"-e") || !_wcsicmp(argv[(nArg + 1)], L"-g") || !_wcsicmp(argv[(nArg + 1)], L"-c") || !_wcsicmp(argv[(nArg + 1)], L"-i") || !_wcsicmp(argv[(nArg + 1)], L"-j"))
 			{
 				printf("[-] -o used without a file name specified\n");
 				return 0;
@@ -132,7 +143,7 @@ int wmain(int argc, wchar_t * argv[])
 		{
 			bReadFromFileArg = TRUE;
 			// file flag initiated, need to check if the file is there
-			if ((nArg + 1) > (argc - 1) || !_wcsicmp(argv[(nArg + 1)], L"-d") || !_wcsicmp(argv[(nArg + 1)], L"-o"))
+			if ((nArg + 1) > (argc - 1) || !_wcsicmp(argv[(nArg + 1)], L"-d") || !_wcsicmp(argv[(nArg + 1)], L"-o") || !_wcsicmp(argv[(nArg + 1)], L"-e") || !_wcsicmp(argv[(nArg + 1)], L"-g") || !_wcsicmp(argv[(nArg + 1)], L"-c") || !_wcsicmp(argv[(nArg + 1)], L"-i") || !_wcsicmp(argv[(nArg + 1)], L"-j"))
 			{
 				printf("[-] -f used without a file name specified\n");
 				return 0;
@@ -154,29 +165,130 @@ int wmain(int argc, wchar_t * argv[])
 				bReadFromFile = TRUE;
 			}
 		}
+
 		// check for domain argument
 		if (!_wcsicmp(argv[nArg], L"-d"))
 		{
 			// domain flag was used
 			bDomainArg = TRUE;
 			// domain flag specified
-			if (((nArg + 1) > (argc - 1)) || !_wcsicmp(argv[(nArg + 1)], L"-f") || !_wcsicmp(argv[(nArg + 1)], L"-o"))
+			if (((nArg + 1) > (argc - 1)) || !_wcsicmp(argv[(nArg + 1)], L"-f") || !_wcsicmp(argv[(nArg + 1)], L"-o") || !_wcsicmp(argv[(nArg + 1)], L"-e") || !_wcsicmp(argv[(nArg + 1)], L"-g") || !_wcsicmp(argv[(nArg + 1)], L"-i") || !_wcsicmp(argv[(nArg + 1)], L"-c") || !_wcsicmp(argv[(nArg + 1)], L"-j"))
 			{
-				printf("[*] -d used without domain specifed - using current domain\n");
+				printf("\n[*] -d used without domain specified - using current domain\n");
 			}
 			else
 			{
-				bDomainSpecifed = TRUE;
+				bDomainspecified = TRUE;
 				domain = argv[(nArg + 1)];
 				printf("[+] Domain Specified: %ls\n", domain);
 			}
+		}
 
+		// check for exclude file argument
+		if (!_wcsicmp(argv[nArg], L"-e"))
+		{
+			if ((nArg + 1) > (argc - 1) || !_wcsicmp(argv[(nArg + 1)], L"-d") || !_wcsicmp(argv[(nArg + 1)], L"-o") || !_wcsicmp(argv[(nArg + 1)], L"-f") || !_wcsicmp(argv[(nArg + 1)], L"-g") || !_wcsicmp(argv[(nArg + 1)], L"-c") || !_wcsicmp(argv[(nArg + 1)], L"-i") || !_wcsicmp(argv[(nArg + 1)], L"-j"))
+			{
+				printf("[-] -e used without a file name specified\n");
+				return 0;
+			}
+			else
+			{				
+				const size_t newsize = 255;
+				char nstring[newsize];
+				
+				#ifdef __MINGW32__
+					wcstombs(nstring, argv[(nArg + 1)],newsize);
+				#else	
+					size_t origsize = wcslen(argv[(nArg + 1)]) + 1;				
+					size_t convertedChars = 0;				
+					wcstombs_s(&convertedChars, nstring, origsize, argv[(nArg + 1)], _TRUNCATE);				
+				#endif
+
+				file_exclude_hosts = fopen(nstring,"r");
+				if (file_exclude_hosts == NULL)
+				{
+					printf("[-] Exclude file not found as specified by -e\n");
+				}
+				else
+				{
+					while (fgets(line, sizeof(line)-1,file_exclude_hosts))
+					{
+						sscanf(line, "%s\n", tmphost);
+						const size_t newsize = 255;
+						wchar_t wcstring[newsize];
+				
+						#ifdef __MINGW32__
+							mbstowcs(wcstring,tmphost,newsize);
+						#else				
+							size_t origsize = strlen(tmphost) + 1;				
+							size_t convertedChars = 0;				
+							mbstowcs_s(&convertedChars, wcstring, origsize, tmphost, _TRUNCATE);
+						#endif
+
+						wprintf(L"host: %ls\n", wcstring);
+						excludeHosts.push_back(wstring(wcstring));
+					}
+					fclose(file_exclude_hosts);
+				}
+
+			}
+		}
+
+		// check for the group argument
+		if (!_wcsicmp(argv[nArg], L"-g"))
+		{
+			if (((nArg + 1) > (argc - 1)) || !_wcsicmp(argv[(nArg + 1)], L"-f") || !_wcsicmp(argv[(nArg + 1)], L"-o") || !_wcsicmp(argv[(nArg + 1)], L"-e") || !_wcsicmp(argv[(nArg + 1)], L"-d") || !_wcsicmp(argv[(nArg + 1)], L"-i") || !_wcsicmp(argv[(nArg + 1)], L"-c") || !_wcsicmp(argv[(nArg + 1)], L"-j"))
+			{
+				printf("[*] -g used without group specified - using \"Domain Admins\"\n");
+				group_enum(users, L"Domain Admins");
+			}
+			else
+			{
+				group = argv[(nArg + 1)];
+				group_enum(users, group);
+			}
+		}
+
+		// check if we want to check access to the found shares
+		if (!_wcsicmp(argv[nArg], L"-c"))
+		{
+			bCheckShareAccess = TRUE;
+		}
+
+		// check for the interval argument
+		if (!_wcsicmp(argv[nArg], L"-i"))
+		{
+			if (((nArg + 1) > (argc - 1)) || !_wcsicmp(argv[(nArg + 1)], L"-f") || !_wcsicmp(argv[(nArg + 1)], L"-o") || !_wcsicmp(argv[(nArg + 1)], L"-e") || !_wcsicmp(argv[(nArg + 1)], L"-d") || !_wcsicmp(argv[(nArg + 1)], L"-g") || !_wcsicmp(argv[(nArg + 1)], L"-c") || !_wcsicmp(argv[(nArg + 1)], L"-j"))
+			{
+				printf("[*] -i used without interval specified - ignoring\n");
+			}
+			else
+			{
+				interval = _wtoi(argv[(nArg + 1)]);
+			}
+		}
+
+		// check for the jitter argument
+		if (!_wcsicmp(argv[nArg], L"-j"))
+		{
+			if (((nArg + 1) > (argc - 1)) || !_wcsicmp(argv[(nArg + 1)], L"-f") || !_wcsicmp(argv[(nArg + 1)], L"-o") || !_wcsicmp(argv[(nArg + 1)], L"-e") || !_wcsicmp(argv[(nArg + 1)], L"-d") || !_wcsicmp(argv[(nArg + 1)], L"-g") || !_wcsicmp(argv[(nArg + 1)], L"-c") || !_wcsicmp(argv[(nArg + 1)], L"-i"))
+			{
+				printf("[*] -j used without jitter specified - ignoring\n");
+			}
+			else
+			{
+				jitter = _wtof(argv[(nArg + 1)]);
+			}
 		}
 	}
+	
+	printf("\n[*] Using interval: %d\n", interval);
+	printf("[*] Using jitter: %.2f\n\n", jitter);
 
 	if (bDomainArg && bReadFromFileArg)
 	{
-		printf("[-] Domain and File specifed, can't do both - exiting...\n\n");
+		printf("[-] Domain and File specified, can't do both - exiting...\n\n");
 		return 0;
 	}
 
@@ -190,7 +302,7 @@ int wmain(int argc, wchar_t * argv[])
 		
 		if (file_of_hosts == NULL)
 		{
-			printf("[-] File not found as specifed by -f\n");
+			printf("[-] File not found as specified by -f\n");
 		}
 		else
 		{
@@ -219,17 +331,40 @@ int wmain(int argc, wchar_t * argv[])
 		netview_enum(hosts,domain);
 	}
 	
-	printf("[+] Number of hosts: %d\n",hosts.size());
+	printf("\n[+] Number of hosts: %d\n",hosts.size());
 
 	for (vector<wstring>::iterator it = hosts.begin(); it != hosts.end(); ++it)
 	{
 		host = const_cast<wchar_t *>(it->c_str());
-		wcout << "\n\n[+] Host: " << host << endl;
-		net_enum(host,domain);
-		ip_enum(host);
-		share_enum(host);
-		session_enum(host);
-		loggedon_enum(host);
+		BOOL excludeHost = FALSE;
+
+		// check if the host is in the exclude list, ignoring case
+		for (vector<wstring>::iterator it = excludeHosts.begin(); it != excludeHosts.end(); ++it){
+			tempHost = const_cast<wchar_t *>(it->c_str());
+			if (!_wcsnicmp(host, tempHost, wcslen(host))) {
+				excludeHost = TRUE;
+			}
+		}
+
+		// only enumerate the host if it wasn't in the exclude list
+		if (!excludeHost){
+			wcout << "\n\n[+] Host: " << host << endl;
+			net_enum(host,domain);
+			ip_enum(host);
+			share_enum(host,bCheckShareAccess);
+			session_enum(users, host);
+			loggedon_enum(users, host);
+
+			if (interval > 0.0){
+				srand( time( NULL ) );
+				int min = (int) (interval * (1-jitter));
+				int max = (int) (interval * (1+jitter));
+				int range = max - min + 1;
+				int sleep_time = rand() % range + min;
+				wcout << "\n[*] Sleeping: " << sleep_time << " seconds" << endl;
+				Sleep(sleep_time*1000);
+			}
+		}
 	}
 
 	if (bOutputToFile)
@@ -237,6 +372,24 @@ int wmain(int argc, wchar_t * argv[])
 		 fclose(outputfile);
 	}
 	return 0;
+}
+
+void print_help(){
+	printf("\nNetview Help\n"
+	"--------------------------------------------------------------------\n\n"
+	"-h \t\t\t: Display this help menu\n"
+	"-f filename.txt \t: Specifies a file to pull a list of hosts from\n"
+	"-e filename.txt \t: Specifies a file of hostnames to exclude\n"
+	"-o filename.txt \t: Out to file instead of STDOUT\n"
+	"-d domain \t\t: Specifies a domain to pull a list of hosts from\n"
+	"\t\t\t  uses current domain if none specified\n"
+	"-g group \t\t: Specify a group name for user hunting\n"
+	"\t\t\t  uses 'Domain Admins' if none specified\n"
+	"-c\t\t\t: Check found shares for read access\n"
+	"-i interval\t\t: Seconds to wait between enumerating hosts\n"
+	"-j jitter\t\t: Percent jitter to apply to the interval (0.0-1.0)\n"
+	);
+	printf("\n");
 }
 
 void netview_enum(vector<wstring> &hosts, wchar_t *domain)
@@ -345,8 +498,6 @@ void net_enum(wchar_t *host, wchar_t *domain)
 void ip_enum(wchar_t *host)
 {
 
-	wprintf(L"The hostcoming into the function is: %ls\n",host);
-
 	WSADATA wsaData;
 	int iResult;
 	int iRetval;
@@ -442,7 +593,62 @@ void ip_enum(wchar_t *host)
 	}
 }
 
-void share_enum(wchar_t *host)
+void group_enum(vector<wstring> &users, wchar_t *group)
+{
+		
+		NET_API_STATUS res;
+
+		// first, get the primary DC for this machine
+		LPCWSTR lpDcName = NULL;
+		res = NetGetDCName(NULL, NULL, (LPBYTE *) &lpDcName);
+		if (res == NERR_Success){
+			wprintf(L"\n[+] Primary DC: %ls\n", lpDcName);
+		}
+		else{
+			// return if there was an error, since we won't be able
+			// to retrieve any users
+			wprintf(L"\n[-] Error: could not retrieve primary DC\n");
+			return;
+		}
+
+		// double check to make sure we got a DC name
+		if (!lpDcName){
+			wprintf(L"[-] Error: could not retrieve primary DC\n");
+			return;
+		}
+
+		wprintf(L"\nEnumerating members of domain group \"%ls\"\n", group);
+
+		// query the DC for all users from the given group
+		GROUP_USERS_INFO_0 *BufPtr, *p;
+		DWORD er=0,tr=0,resume=0, t;
+		res = NetGroupGetUsers(lpDcName,group,0,(LPBYTE *)&BufPtr,
+								MAX_PREFERRED_LENGTH,&er,&tr,NULL);
+
+		if(res == ERROR_SUCCESS || res == ERROR_MORE_DATA)
+		{
+			p=BufPtr;
+			for(t=1;t<=er;t++)
+			{
+				wprintf(L"[+] \"%ls\" user: %ls\n", group, p->grui0_name);
+				users.push_back(wstring(p->grui0_name));
+				p++;
+			}
+		}
+		else if (res == NERR_GroupNotFound){
+			wprintf(L"[-] Error: group name not found\n");
+		}
+		else
+		{ 
+			wprintf(L"[-] Error %d\n", res);
+		}
+
+		if (BufPtr != NULL){
+			NetApiBufferFree(BufPtr);
+		}
+}
+
+void share_enum(wchar_t *host, bool bCheckShareAccess)
 {
 	PSHARE_INFO_1 BufPtr,p;
 	NET_API_STATUS res;
@@ -459,8 +665,19 @@ void share_enum(wchar_t *host)
 			for(t=1;t<=er;t++)
 			{
 				wprintf(L"[+] %ls - Share : %-20s : %-30s\n", host, p->shi1_netname, p->shi1_remark);
-				// Suggested mod by "Ben" on R362 comments. Need to figure the best way to print type.
-				//wprintf(L"[+] %ls - Share - %s - %s - %s\n", host, p->shi1_netname,p->shi1_type, p->shi1_remark);
+				
+				// skip IPC$, and see if we want to check access to this share
+				if (_wcsicmp(p->shi1_netname, L"IPC$") && bCheckShareAccess){
+					wchar_t path[255];
+					swprintf(path, 255, L"\\\\%s\\%s", host, p->shi1_netname);
+
+					if(CanAccessFolder(path, GENERIC_READ)){
+						wprintf(L"[+] Read access to: %ls\n", path);
+					}
+					else{
+						wprintf(L"[-] No access to:%ls\n", path);
+					}
+				}
 				p++;
 			}
 			NetApiBufferFree(BufPtr);
@@ -472,7 +689,7 @@ void share_enum(wchar_t *host)
 	} while (res==ERROR_MORE_DATA);
 }
 
-void session_enum(wchar_t *host)
+void session_enum(vector<wstring> &users, wchar_t *host)
 {
 	LPSESSION_INFO_10 pBuf = NULL;
 	LPSESSION_INFO_10 pTmpBuf = NULL;
@@ -486,6 +703,7 @@ void session_enum(wchar_t *host)
 	LPTSTR pszClientName = NULL;
 	LPTSTR pszUserName = NULL;
 	NET_API_STATUS nStatus;
+	wchar_t *user = NULL;
 
 	printf("\nEnumerating Session Info\n");
 
@@ -522,6 +740,14 @@ void session_enum(wchar_t *host)
 						pTmpBuf->sesi10_idle_time
 						);
 
+					// check if the user is in the target user list if one is specified
+					for (vector<wstring>::iterator it = users.begin(); it != users.end(); ++it){
+						user = const_cast<wchar_t *>(it->c_str());
+						if (!_wcsicmp(user, (pTmpBuf->sesi10_username))) {
+							wprintf(L"[+] %ws - Target user found - %s\n", host, pTmpBuf->sesi10_username);
+						}
+					}
+					
 					pTmpBuf++;
 					dwTotalCount++;
 				}
@@ -545,7 +771,7 @@ void session_enum(wchar_t *host)
 	}
 }
 
-void loggedon_enum(wchar_t *host)
+void loggedon_enum(vector<wstring> &users, wchar_t *host)
 {
 	LPWKSTA_USER_INFO_1 pBuf = NULL;
 	LPWKSTA_USER_INFO_1 pTmpBuf;
@@ -557,6 +783,7 @@ void loggedon_enum(wchar_t *host)
 	DWORD z;
 	DWORD dwTotalCount = 0;
 	NET_API_STATUS nStatus;
+	wchar_t *user = NULL;
 	
 	printf("\nEnumerating Logged-on Users\n");
 	do
@@ -585,6 +812,15 @@ void loggedon_enum(wchar_t *host)
 					if (!wcschr((wchar_t*)(pTmpBuf)->wkui1_username, L'$'))
 					{
 						wprintf(L"[+] %ws - Logged-on - %s\\%s\n", host, pTmpBuf->wkui1_logon_domain, pTmpBuf->wkui1_username);
+
+						// check if the user is in the target user list if one is specified
+						for (vector<wstring>::iterator it = users.begin(); it != users.end(); ++it){
+							user = const_cast<wchar_t *>(it->c_str());
+							if (!_wcsicmp(user, (pTmpBuf->wkui1_username))) {
+								wprintf(L"[+] %ws - Target user found - %s\\%s\n", host, pTmpBuf->wkui1_logon_domain, pTmpBuf->wkui1_username);
+							}
+						}
+
 					}
 
 					pTmpBuf++;
@@ -604,4 +840,47 @@ void loggedon_enum(wchar_t *host)
 		NetApiBufferFree(pBuf);
 		pBuf = NULL;
 	}
+}
+
+// function shamelessly stolen from Aaron Ballman's code sample
+// at http://blog.aaronballman.com/2011/08/how-to-check-access-rights/
+bool CanAccessFolder( LPCTSTR folderName, DWORD genericAccessRights )
+{
+    bool bRet = false;
+    DWORD length = 0;
+    if (!::GetFileSecurity( folderName, OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION 
+            | DACL_SECURITY_INFORMATION, NULL, NULL, &length ) && 
+            ERROR_INSUFFICIENT_BUFFER == ::GetLastError()) {
+        PSECURITY_DESCRIPTOR security = static_cast< PSECURITY_DESCRIPTOR >( ::malloc( length ) );
+        if (security && ::GetFileSecurity( folderName, OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION
+                            | DACL_SECURITY_INFORMATION, security, length, &length )) {
+            HANDLE hToken = NULL;
+            if (::OpenProcessToken( ::GetCurrentProcess(), TOKEN_IMPERSONATE | TOKEN_QUERY | 
+                    TOKEN_DUPLICATE | STANDARD_RIGHTS_READ, &hToken )) {
+                HANDLE hImpersonatedToken = NULL;
+                if (::DuplicateToken( hToken, SecurityImpersonation, &hImpersonatedToken )) {
+                    GENERIC_MAPPING mapping = { 0xFFFFFFFF };
+                    PRIVILEGE_SET privileges = { 0 };
+                    DWORD grantedAccess = 0, privilegesLength = sizeof( privileges );
+                    BOOL result = FALSE;
+ 
+                    mapping.GenericRead = FILE_GENERIC_READ;
+                    mapping.GenericWrite = FILE_GENERIC_WRITE;
+                    mapping.GenericExecute = FILE_GENERIC_EXECUTE;
+                    mapping.GenericAll = FILE_ALL_ACCESS;
+ 
+                    ::MapGenericMask( &genericAccessRights, &mapping );
+                    if (::AccessCheck( security, hImpersonatedToken, genericAccessRights, 
+                            &mapping, &privileges, &privilegesLength, &grantedAccess, &result )) {
+                        bRet = (result == TRUE);
+                    }
+                    ::CloseHandle( hImpersonatedToken );
+                }
+                ::CloseHandle( hToken );
+            }
+            ::free( security );
+        }
+    }
+ 
+    return bRet;
 }
