@@ -340,6 +340,7 @@ int wmain(int argc, wchar_t * argv[])
 
 	for (vector<wstring>::iterator it = hosts.begin(); it != hosts.end(); ++it)
 	{
+		fflush(stdout);
 		host = const_cast<wchar_t *>(it->c_str());
 		BOOL excludeHost = FALSE;
 
