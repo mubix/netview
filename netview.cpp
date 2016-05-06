@@ -99,8 +99,6 @@ int wmain(int argc, wchar_t * argv[])
 
 	// Don't buffer anything!
 	setbuf(stdout, NULL);
-	std::cout.setf(std::ios_base::unitbuf);
-	std::wcout.setf(std::ios_base::unitbuf);
 
 	if (argc == 1)
 	{ 
@@ -354,7 +352,8 @@ int wmain(int argc, wchar_t * argv[])
 
 		// only enumerate the host if it wasn't in the exclude list
 		if (!excludeHost){
-			wcout << "\n\n[+] Host: " << host << endl;
+			wprintf(L"\n\n[+] Host: %ws", host);
+			//wcout << "\n\n[+] Host: " << host << endl;
 			net_enum(host,domain);
 			ip_enum(host);
 			share_enum(host,bCheckShareAccess);
@@ -367,7 +366,8 @@ int wmain(int argc, wchar_t * argv[])
 				int max = (int) (interval * (1+jitter));
 				int range = max - min + 1;
 				int sleep_time = rand() % range + min;
-				wcout << "\n[*] Sleeping: " << sleep_time << " seconds" << endl;
+				printf("\n[*] Sleeping: %d seconds", sleep_time);
+				//wcout << "\n[*] Sleeping: " << sleep_time << " seconds" << endl;
 				Sleep(sleep_time*1000);
 			}
 		}
@@ -458,7 +458,8 @@ void net_enum(wchar_t *host, wchar_t *domain)
 	LPSERVER_INFO_101 pBuf = NULL;
 	LPSERVER_INFO_101 pTmpBuf;
 
-	wcout << "\nEnumerating AD Info" << endl;
+	wprintf(L"\nEnumerating AD Info");
+	//wcout << "\nEnumerating AD Info" << endl;
 
 	nStatus = NetServerGetInfo(pszServerName,
 								dwLevel,
