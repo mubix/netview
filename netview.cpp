@@ -97,6 +97,11 @@ int wmain(int argc, wchar_t * argv[])
 	vector<wstring> users;
 	vector<wstring> excludeHosts;
 
+	// Don't buffer anything!
+	setbuf(stdout, NULL);
+	std::cout.setf(std::ios_base::unitbuf);
+	std::wcout.setf(std::ios_base::unitbuf);
+
 	if (argc == 1)
 	{ 
 		print_help();
@@ -335,7 +340,6 @@ int wmain(int argc, wchar_t * argv[])
 
 	for (vector<wstring>::iterator it = hosts.begin(); it != hosts.end(); ++it)
 	{
-		fflush(stdout);
 		host = const_cast<wchar_t *>(it->c_str());
 		BOOL excludeHost = FALSE;
 
