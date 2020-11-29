@@ -9,12 +9,12 @@ endif
 ifeq ($(OS),NT)
 
 # Windows MinGW using Cgywin.
-CC			= /usr/bin/i686-pc-mingw32-g++.exe
-LD	 		= /usr/bin/i686-pc-mingw32-ld.exe
+CC			= g++.exe
+LD	 		= ld.exe
 
-WIN_INCLUDES		+= -I"/usr/i686-pc-mingw32/sys-root/mingw/include"
-WIN_LIBPATH		+= -L"/usr/i686-pc-mingw32/sys-root/mingw/lib"\
-			   -L"/usr/i686-pc-mingw32/sys-root/mingw/bin/libstdc++-6.dll"
+#WIN_INCLUDES		+= -I"/usr/i686-pc-mingw32/sys-root/mingw/include"
+#WIN_LIBPATH		+= -L"/usr/i686-pc-mingw32/sys-root/mingw/lib"\
+#			   -L"/usr/i686-pc-mingw32/sys-root/mingw/bin/libstdc++-6.dll"
 WIN_LIBS		+= -lgcc -lodbc32 -lwsock32 -lwinspool\
 			-lwinmm -lshell32 -lcomctl32 -lctl3d32\
 			-lodbc32 -ladvapi32 -lodbc32 -lopengl32\
@@ -23,14 +23,14 @@ WIN_LIBS		+= -lgcc -lodbc32 -lwsock32 -lwinspool\
 
 WIN_LDFLAGS 		+= -s 
 WIN_CFLAGS		+= -static -mwindows -O2 -Wall\
-			-g -I. $(WIN_INCLUDES) -DWINVER=0x0501\
+			-g -DWINVER=0x0501\
 			-D__WIN95__ -D__GNUWIN32__ -DSTRICT\
 			-DHAVE_W32API_H -D__WXMSW__ -D__WINDOWS__\
 			-DUNICODE -D_UNICODE\
 
 LDFLAGS			= $(WIN_LDFLAGS)
 CFLAGS			= $(WIN_CFLAGS)
-LIBPATH			= $(WIN_LIBPATH)
+# LIBPATH			= $(WIN_LIBPATH)
 LIBS			= $(WIN_LIBS)
 
 #This is for the BT5R3 MinGW release.
