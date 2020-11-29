@@ -22,9 +22,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         automatic_release_tag: "latest"
-        release_name: Release ${{ github.ref }}
-        body: |
-          Changes in this Release
-          - Auto building
+        title: Release ${{ github.ref }}
         files: netview.exe
 
