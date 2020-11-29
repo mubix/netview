@@ -19,7 +19,7 @@ jobs:
       - name: msbuild
         run: msbuild /property:Configuration=Release
       - name: debug_dirlist
-        run: dir /b /s
+        run: gci -recurse
       - name: Create Release
         id: create_release
         uses: "marvinpinto/action-automatic-releases@latest"
