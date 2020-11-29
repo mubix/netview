@@ -18,8 +18,6 @@ jobs:
         uses: microsoft/setup-msbuild@v1.0.2
       - name: msbuild
         run: msbuild /property:Configuration=Release
-      - name: debug_dirlist
-        run: gci -recurse
       - name: Create Release
         id: create_release
         uses: "marvinpinto/action-automatic-releases@latest"
@@ -27,6 +25,6 @@ jobs:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: "latest"
           title: Release ${{ github.ref }}
-          files: release\bin\netview.exe
+          files: Release\netview.exe
           prerelease: false
 
