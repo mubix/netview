@@ -13,8 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: make
-      run: make all
+    - name: msbuild
+      run: msbuild
     - name: Create Release
       id: create_release
       uses: "marvinpinto/action-automatic-releases@latest"
