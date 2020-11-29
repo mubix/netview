@@ -24,7 +24,7 @@ jobs:
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: "latest"
-          title: Release ${{ github.ref }}
-          files: Release\netview.exe
+          title: Release ${{ github.sha }}
+          files: ./Release/netview.exe
           prerelease: false
 
